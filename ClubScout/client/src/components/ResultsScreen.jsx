@@ -86,6 +86,28 @@ function ResultsScreen({ sessionId, onRestart }) {
     const [recommendations, setRecommendations] = useState([]);
     const [error, setError] = useState(null);
 
+    // Feedback state
+    const [rating, setRating] = useState(null);
+    const [feedback, setFeedback] = useState('');
+    const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
+    async function handleFeedbackSubmit() {
+        if (rating === null) return;
+
+        try {
+            await fetch('http://localhost:3000/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, rating, feedback })
+            });
+            setFeedbackSubmitted(true);
+        } catch (err) {
+            console.error('Failed to submit feedback', err);
+            // Still show success to user to not disrupt flow
+            setFeedbackSubmitted(true);
+        }
+    }
+
     useEffect(() => {
         async function loadResults() {
             setLoading(true);
@@ -220,16 +242,99 @@ function ResultsScreen({ sessionId, onRestart }) {
                     </button>
                 </div>
 
-                { /* Recommendations */ }
-                <div className="grid gap-5 md:grid-cols-2">
-                    {recommendations.length === 0 ? (
-                        <p className="text-sm text-slate-200">
-                            No recommendations yet. Try restarting the quiz.
-                        </p>
+                { /* Recommendations */}
+                <div className="grid gap-8 md:grid-cols-2">
+                    {/* Left Column: BU Clubs */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="inline-block w-3 h-3 rounded-full bg-[#B5182A]" />
+                            <h2 className="text-xl font-bold text-slate-50">BU Organizations</h2>
+                        </div>
+                        {recommendations.filter(r => r.type === 'BU').length === 0 ? (
+                            <p className="text-sm text-slate-400">No BU matches found.</p>
+                        ) : (
+                            recommendations.filter(r => r.type === 'BU').map((org) => (
+                                <OrgRecommendationCard key={org.id} org={org} />
+                            ))
+                        )}
+                    </div>
+
+                    {/* Right Column: External Clubs */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="inline-block w-3 h-3 rounded-full bg-[#3B82F6]" />
+                            <h2 className="text-xl font-bold text-slate-50">External Organizations</h2>
+                        </div>
+                        {recommendations.filter(r => r.type === 'External').length === 0 ? (
+                            <p className="text-sm text-slate-400">No external matches found.</p>
+                        ) : (
+                            recommendations.filter(r => r.type === 'External').map((org) => (
+                                <OrgRecommendationCard key={org.id} org={org} />
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                { /* Feedback Section */}
+                <div className="mt-12 pt-8 border-t border-slate-800">
+                    <h3 className="text-xl font-bold text-slate-50 mb-4 text-center">
+                        How was your experience?
+                    </h3>
+
+                    {!feedbackSubmitted ? (
+                        <div className="max-w-md mx-auto bg-slate-900 p-6 rounded-xl border border-slate-800">
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Rate us (1-10)
+                                </label>
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="10"
+                                    value={rating || 5}
+                                    onChange={(e) => setRating(parseInt(e.target.value))}
+                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                />
+                                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                                    <span>1</span>
+                                    <span>5</span>
+                                    <span>10</span>
+                                </div>
+                                <div className="text-center mt-2 text-indigo-400 font-bold">
+                                    {rating ? rating : '-'}
+                                </div>
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Any comments? (Optional)
+                                </label>
+                                <textarea
+                                    value={feedback}
+                                    onChange={(e) => setFeedback(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                    rows="3"
+                                    placeholder="Tell us what you think..."
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleFeedbackSubmit}
+                                disabled={rating === null}
+                                className={`w-full py-2 px-4 rounded-md font-medium transition-colors ${rating !== null
+                                    ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                    : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                    }`}
+                            >
+                                Done
+                            </button>
+                        </div>
                     ) : (
-                        recommendations.map((org) => (
-                            <OrgRecommendationCard key={org.id} org={org} />
-                        ))
+                        <div className="text-center p-6 bg-green-900/20 rounded-xl border border-green-900/50 max-w-md mx-auto">
+                            <p className="text-green-400 font-medium">
+                                Thank you for your feedback!
+                            </p>
+                        </div>
                     )}
                 </div>
             </div>
@@ -239,7 +344,7 @@ function ResultsScreen({ sessionId, onRestart }) {
 
 // Small card component for each recommendation
 function OrgRecommendationCard({ org }) {
-    const isBU = org.type === 'BU' ;
+    const isBU = org.type === 'BU';
 
     return (
         <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-l-[var(--accent-color)]"
@@ -249,7 +354,7 @@ function OrgRecommendationCard({ org }) {
             }}
         >
             <div className="flex items-start justify-between mb-1">
-                <h3 className="text-sm font-semibold text-gray-900 truncate">  
+                <h3 className="text-sm font-semibold text-gray-900 truncate">
                     {org.name}
                 </h3>
                 <span
