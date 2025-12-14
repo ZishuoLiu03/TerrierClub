@@ -95,11 +95,7 @@ function ResultsScreen({ sessionId, onRestart }) {
         if (rating === null) return;
 
         try {
-            await fetch('http://localhost:3000/api/feedback', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId, rating, feedback })
-            });
+            await api.submitFeedback(sessionId, rating, feedback);
             setFeedbackSubmitted(true);
         } catch (err) {
             console.error('Failed to submit feedback', err);

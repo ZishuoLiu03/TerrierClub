@@ -46,6 +46,11 @@ function App() {
 
   const handleAnswer = async (optionId) => {
     if (submitting) return;
+    // Explicitly blur the button to prevent sticky focus states on mobile
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
     setSubmitting(true);
 
     try {
@@ -100,6 +105,7 @@ function App() {
                     py-12 px-4 sm:px-6 lg:px-8">
       <ProgressBar current={currentIndex + 1} total={questions.length} />
       <QuestionCard
+        key={questions[currentIndex].id || currentIndex}
         question={questions[currentIndex]}
         onAnswer={handleAnswer}
         isSubmitting={submitting}

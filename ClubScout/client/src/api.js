@@ -1,5 +1,7 @@
-// Use current hostname (works for localhost and local IP)
-const API_URL = `http://${window.location.hostname}:3000/api`;
+// Use environment variable for API URL in production, or fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3000/api`;
+console.log("Configuration | VITE_API_URL:", import.meta.env.VITE_API_URL);
+console.log("Configuration | Effective API_URL:", API_URL);
 
 async function initSession(nickname) {
   // Reuse any existing sessionId so recommendations can be recomputed later
@@ -63,9 +65,23 @@ async function getResults(sessionId) {
   return res.json(); // { persona, recommendations }
 }
 
+async function submitFeedback(sessionId, rating, feedback) {
+  const res = await fetch(`${API_URL}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, rating, feedback }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to submit feedback');
+  }
+  return res.json();
+}
+
 export const api = {
   initSession,
   getQuestions,
   submitAnswer,
   getResults,
+  submitFeedback,
 };

@@ -1,0 +1,14 @@
+# Credentials
+service-account.json
+.env
+
+# Dependencies
+node_modules/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/

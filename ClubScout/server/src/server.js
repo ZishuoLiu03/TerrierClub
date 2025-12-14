@@ -1,16 +1,19 @@
 // server/server.js
+const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
 
+const { db } = require('./firebase');
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Allow frontend (Vite on 5173) to call this API
 app.use(cors());
 app.use(express.json());
 
-// In-memory sessions store (reset when server restarts)
-const sessions = {};
+// In-memory sessions removed in favor of Firestore
+// const sessions = {};
 
 /**
  * 1. QUESTIONS
@@ -94,26 +97,31 @@ app.get('/api/questions', (req, res) => {
  * POST /api/init-session
  * body: { sessionId, nickname }
  */
-app.post('/api/init-session', (req, res) => {
+app.post('/api/init-session', async (req, res) => {
   const { sessionId, nickname } = req.body;
 
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId is required' });
   }
 
-  if (!sessions[sessionId]) {
-    sessions[sessionId] = {
-      nickname: nickname || 'Anonymous',
-      answers: [], // { questionId, optionId }
-    };
-  } else {
-    // update nickname if changed
-    if (nickname) {
-      sessions[sessionId].nickname = nickname;
-    }
-  }
+  try {
+    const sessionRef = db.collection('sessions').doc(sessionId);
+    const doc = await sessionRef.get();
 
-  res.json({ sessionId });
+    if (!doc.exists) {
+      await sessionRef.set({
+        nickname: nickname || 'Anonymous',
+        answers: [],
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    } else if (nickname) {
+      await sessionRef.update({ nickname });
+    }
+    res.json({ sessionId });
+  } catch (error) {
+    console.error("Firestore Error:", error);
+    res.status(500).json({ error: "Failed to init session" });
+  }
 });
 
 /**
@@ -121,35 +129,42 @@ app.post('/api/init-session', (req, res) => {
  * POST /api/submit
  * body: { sessionId, questionId, optionId }
  */
-app.post('/api/submit', (req, res) => {
+app.post('/api/submit', async (req, res) => {
   const { sessionId, questionId, optionId } = req.body;
 
   if (!sessionId || !questionId || !optionId) {
-    return res
-      .status(400)
-      .json({ error: 'sessionId, questionId, and optionId are required' });
+    return res.status(400).json({ error: 'sessionId, questionId, and optionId are required' });
   }
 
-  const session = sessions[sessionId];
-  if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
+  try {
+    const sessionRef = db.collection('sessions').doc(sessionId);
+    const doc = await sessionRef.get();
 
-  // Replace answer for that question if it already exists
-  const existingIndex = session.answers.findIndex(
-    (a) => a.questionId === questionId
-  );
-  if (existingIndex >= 0) {
-    session.answers[existingIndex].optionId = optionId;
-  } else {
-    session.answers.push({ questionId, optionId });
-  }
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
 
-  res.json({ ok: true });
+    const data = doc.data();
+    let answers = data.answers || [];
+
+    // Replace or push
+    const existingIndex = answers.findIndex(a => a.questionId === questionId);
+    if (existingIndex >= 0) {
+      answers[existingIndex].optionId = optionId;
+    } else {
+      answers.push({ questionId, optionId });
+    }
+
+    await sessionRef.update({ answers });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Firestore Error:", error);
+    res.status(500).json({ error: "Failed to submit answer" });
+  }
 });
 
 /**
- * 4. RESULTS (persona + recommendations)
+ * 4. RESULTS
  * GET /api/results?sessionId=...
  */
 app.get('/api/results', async (req, res) => {
@@ -159,18 +174,22 @@ app.get('/api/results', async (req, res) => {
     return res.status(400).json({ error: 'sessionId is required' });
   }
 
-  const session = sessions[sessionId];
-  if (!session) {
-    return res.status(404).json({ error: 'Session not found' });
+  try {
+    const doc = await db.collection('sessions').doc(sessionId).get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = doc.data();
+    const persona = computePersona(session.answers || []);
+    const recommendations = await computeRecommendations(persona.type, session.answers || []);
+
+    res.json({ persona, recommendations });
+  } catch (error) {
+    console.error("Firestore Error:", error);
+    res.status(500).json({ error: "Failed to get results" });
   }
-
-  const persona = computePersona(session.answers);
-  const recommendations = await computeRecommendations(persona.type, session.answers);
-
-  res.json({
-    persona,
-    recommendations,
-  });
 });
 
 /**
@@ -178,10 +197,34 @@ app.get('/api/results', async (req, res) => {
  * POST /api/feedback
  * Body: { sessionId, rating, feedback }
  */
-app.post('/api/feedback', (req, res) => {
+/**
+ * 5. FEEDBACK
+ * POST /api/feedback
+ * Body: { sessionId, rating, feedback }
+ */
+app.post('/api/feedback', async (req, res) => {
   const { sessionId, rating, feedback } = req.body;
-  console.log(`[FEEDBACK] Session: ${sessionId}, Rating: ${rating}, Feedback: ${feedback}`);
-  res.json({ success: true });
+
+  if (!sessionId || !rating) {
+    return res.status(400).json({ error: 'sessionId and rating are required' });
+  }
+
+  try {
+    const sessionRef = db.collection('sessions').doc(sessionId);
+    await sessionRef.set({
+      feedback: {
+        rating,
+        comment: feedback || '',
+        submittedAt: admin.firestore.FieldValue.serverTimestamp()
+      }
+    }, { merge: true }); // Merge so we don't overwrite answers
+
+    console.log(`[FEEDBACK] Saved for session ${sessionId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Firestore Error (Feedback):", error);
+    res.status(500).json({ error: "Failed to save feedback" });
+  }
 });
 
 // ---------------- PERSONA + RECOMMENDATIONS LOGIC ----------------
@@ -255,11 +298,12 @@ const PERSONA_DETAILS = {
 // Load clubs from CSV
 const fs = require('fs');
 const path = require('path');
-const csvPath = path.join(__dirname, '../../../Data/terrier_clubs_contacts.csv');
-const keywordsPath = path.join(__dirname, '../../../Data/terrier_clubs_keywords.csv');
+// Data is now bundled inside the server folder for Docker deployment
+const csvPath = path.join(__dirname, '../Data/terrier_clubs_contacts.csv');
+const keywordsPath = path.join(__dirname, '../Data/terrier_clubs_keywords.csv');
 
 let ALL_CLUBS = [];
-const OPENAI_API_KEY = "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"; // User to replace this
+const OPENAI_API_KEY = "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"; // User to replace this
 
 function parseCSV(csvText) {
   const lines = csvText.split(/\r?\n/);
