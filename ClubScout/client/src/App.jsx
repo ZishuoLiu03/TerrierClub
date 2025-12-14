@@ -44,6 +44,12 @@ function App() {
     }
   };
 
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
   const handleAnswer = async (optionId) => {
     if (submitting) return;
     // Explicitly blur the button to prevent sticky focus states on mobile
@@ -109,6 +115,8 @@ function App() {
         question={questions[currentIndex]}
         onAnswer={handleAnswer}
         isSubmitting={submitting}
+        onPrevious={handlePrevious}
+        isFirstQuestion={currentIndex === 0}
       />
     </div>
   );

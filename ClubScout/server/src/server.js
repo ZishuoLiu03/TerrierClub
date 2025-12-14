@@ -1,4 +1,5 @@
 // server/server.js
+require('dotenv').config({ path: '../.env' });
 const admin = require('firebase-admin');
 const express = require('express');
 const cors = require('cors');
@@ -298,12 +299,13 @@ const PERSONA_DETAILS = {
 // Load clubs from CSV
 const fs = require('fs');
 const path = require('path');
+
 // Data is now bundled inside the server folder for Docker deployment
 const csvPath = path.join(__dirname, '../Data/terrier_clubs_contacts.csv');
 const keywordsPath = path.join(__dirname, '../Data/terrier_clubs_keywords.csv');
 
 let ALL_CLUBS = [];
-const OPENAI_API_KEY = "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"; // User to replace this
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 function parseCSV(csvText) {
   const lines = csvText.split(/\r?\n/);

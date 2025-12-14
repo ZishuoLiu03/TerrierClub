@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function QuestionCard({ question, onAnswer, isSubmitting }) {
+export default function QuestionCard({ question, onAnswer, isSubmitting, onPrevious, isFirstQuestion }) {
   return (
     <div className="bg-white/95 backdrop-blur p-8 rounded-2xl shadow-2xl 
                     max-w-2xl w-full mx-4 border border-slate-200/90 
@@ -58,10 +58,27 @@ export default function QuestionCard({ question, onAnswer, isSubmitting }) {
         ))}
       </div>
 
-      {/* Subtle hint at bottom */}
-      <p className="mt-5 text-[11px] text-slate-400 text-right">
-        Go with your gut! That's what reflects your real persona.
-      </p>
+      {/* Navigation & Hint */}
+      <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
+        <button
+          onClick={onPrevious}
+          disabled={!onPrevious || isFirstQuestion}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 border
+                ${(!onPrevious || isFirstQuestion)
+              ? 'text-slate-300 border-transparent cursor-not-allowed'
+              : 'text-slate-700 border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 shadow-sm active:scale-95'
+            }`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back
+        </button>
+
+        <p className="text-[11px] text-slate-400">
+          Go with your gut! That's what reflects your real persona.
+        </p>
+      </div>
     </div>
   );
 }

@@ -12,20 +12,25 @@ try {
         // But specific handling can be useful
         console.log("Using GOOGLE_APPLICATION_CREDENTIALS");
     } else {
-        // Option 2: Look for 'service-account.json' in ClubScout root (parent of server)
-        const keyPath = path.join(__dirname, '../../service-account.json');
+        // Option 2: Look for 'service-account.json' in TerrierClub_Final root (parent of ClubScout)
+        const keyPath = path.join(__dirname, '../../../service-account.json');
+        console.log("Attempting to load service account from:", keyPath);
         serviceAccount = require(keyPath);
+        console.log("Successfully loaded service account.");
     }
 } catch (e) {
+    console.error("Error loading service account:", e.message);
     console.log("No partial service-account.json found or needed if running on Google Cloud.");
 }
 
 if (!admin.apps.length) {
     if (serviceAccount) {
+        console.log("Initializing Firebase with service account cert.");
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount)
         });
     } else {
+        console.log("Initializing Firebase with Application Default Credentials (ADC).");
         // Fallback to Application Default Credentials (works on GCP automatically)
         admin.initializeApp();
     }
