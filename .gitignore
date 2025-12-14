@@ -1,6 +1,8 @@
 # Credentials
 service-account.json
 .env
+.env.*
+!.env.example
 
 # Dependencies
 node_modules/
@@ -12,3 +14,5 @@ Thumbs.db
 # Build
 dist/
 build/
+ClubScout/server/.env
+ClubScout/server/.env
